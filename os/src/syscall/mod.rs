@@ -27,6 +27,41 @@ mod process;
 use fs::*;
 use process::*;
 /// handle syscall exception with `syscall_id` and other arguments
+/*pub fn syscall(syscall_id: usize, args: [usize; 3], ti: *mut TaskInfo) -> isize {
+    match syscall_id {
+        SYSCALL_WRITE => {
+            unsafe {
+                (*ti).syscall_times[SYSCALL_WRITE] += 1;
+            };
+            sys_write(args[0], args[1] as *const u8, args[2])
+        }
+        SYSCALL_EXIT => {
+            unsafe {
+                (*ti).syscall_times[SYSCALL_EXIT] += 1;
+            };
+            sys_exit(args[0] as i32)
+        }
+        SYSCALL_YIELD => {
+            unsafe {
+                (*ti).syscall_times[SYSCALL_YIELD] += 1;
+            };
+            sys_yield()
+        }
+        SYSCALL_GET_TIME => {
+            unsafe {
+                (*ti).syscall_times[SYSCALL_GET_TIME] += 1;
+            };
+            sys_get_time(args[0] as *mut TimeVal, args[1])
+        }
+        SYSCALL_TASK_INFO => {
+            unsafe {
+                (*ti).syscall_times[SYSCALL_TASK_INFO] += 1;
+            };
+            sys_task_info(args[0] as *mut TaskInfo)
+        }
+        _ => panic!("Unsupported syscall_id: {}", syscall_id),
+    }
+}*/
 pub fn syscall(syscall_id: usize, args: [usize; 3]) -> isize {
     match syscall_id {
         SYSCALL_WRITE => sys_write(args[0], args[1] as *const u8, args[2]),
