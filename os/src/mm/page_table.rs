@@ -1,6 +1,6 @@
 //! Implementation of [`PageTableEntry`] and [`PageTable`].
 
-use super::{frame_alloc, FrameTracker, PhysPageNum, StepByOne, VirtAddr, VirtPageNum};
+use super::{frame_alloc, FrameTracker, PhysAddr, PhysPageNum, StepByOne, VirtAddr, VirtPageNum};
 use alloc::vec;
 use alloc::vec::Vec;
 use bitflags::*;
@@ -108,7 +108,7 @@ impl PageTable {
         result
     }
     /// Find PageTableEntry by VirtPageNum
-    fn find_pte(&self, vpn: VirtPageNum) -> Option<&mut PageTableEntry> {
+    pub fn find_pte(&self, vpn: VirtPageNum) -> Option<&mut PageTableEntry> {
         let idxs = vpn.indexes();
         let mut ppn = self.root_ppn;
         let mut result: Option<&mut PageTableEntry> = None;
@@ -147,6 +147,18 @@ impl PageTable {
     pub fn token(&self) -> usize {
         8usize << 60 | self.root_ppn.0
     }
+    /// pte is mapped?
+    pub fn mapped_valid(&self, vpn: VirtPageNum) -> bool {
+        //map不合法的两种情况：1.没找到pte，这时候一般需要create 2.找到了但是pte不合法
+        if let Some(i) = self.find_pte(vpn) {
+            if i.is_valid() {
+                return true;
+            } else {
+                return false;
+            }
+        }
+        false
+    }
 }
 
 /// Translate&Copy a ptr[u8] array with LENGTH len to a mutable u8 Vec through page table
@@ -170,4 +182,15 @@ pub fn translated_byte_buffer(token: usize, ptr: *const u8, len: usize) -> Vec<&
         start = end_va.into();
     }
     v
+}
+
+pub fn translate_va2pa(token: usize, va: VirtAddr) -> PhysAddr {
+    let page_table = PageTable::from_token(token);
+    //想办法写入对应的物理地址，va -> vpn -> ppn + offset -> pa
+    let vpn = va.floor();
+    let offset = va.page_offset();
+    let ppn = page_table.translate(vpn).unwrap().ppn();
+    let pa: PhysAddr = ppn.into();
+    let pa_offset: PhysAddr = PhysAddr(pa.0 + offset);
+    pa_offset
 }
