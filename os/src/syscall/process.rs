@@ -161,7 +161,7 @@ pub fn sys_munmap(start: usize, len: usize) -> isize {
     for i in start_vpn_floor.0..end_vpn_ceil.0 {
         //不能出现没有mapped过的
         if memory_set_mut.page_table.mapped_valid(VirtPageNum::from(i)) {
-            println!("ok{}", i);
+            //println!("ok{}", i);
         } else {
             return -1;
         }
