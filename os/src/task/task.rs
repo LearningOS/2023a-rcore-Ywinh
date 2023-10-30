@@ -1,7 +1,7 @@
 //! Types related to task management & Functions for completely changing TCB
 use super::TaskContext;
 use super::{kstack_alloc, pid_alloc, KernelStack, PidHandle};
-use crate::config::TRAP_CONTEXT_BASE;
+use crate::config::{MAX_SYSCALL_NUM, TRAP_CONTEXT_BASE};
 use crate::mm::{MemorySet, PhysPageNum, VirtAddr, KERNEL_SPACE};
 use crate::sync::UPSafeCell;
 use crate::trap::{trap_handler, TrapContext};
@@ -68,6 +68,15 @@ pub struct TaskControlBlockInner {
 
     /// Program break
     pub program_brk: usize,
+
+    /// first time start
+    pub task_start: usize,
+
+    /// is first?
+    pub task_flag: bool,
+
+    /// syscall times
+    pub task_syscall_times: [u32; MAX_SYSCALL_NUM],
 }
 
 impl TaskControlBlockInner {
@@ -118,6 +127,9 @@ impl TaskControlBlock {
                     exit_code: 0,
                     heap_bottom: user_sp,
                     program_brk: user_sp,
+                    task_start: 0,
+                    task_flag: false,
+                    task_syscall_times: [0; MAX_SYSCALL_NUM],
                 })
             },
         };
@@ -191,6 +203,10 @@ impl TaskControlBlock {
                     exit_code: 0,
                     heap_bottom: parent_inner.heap_bottom,
                     program_brk: parent_inner.program_brk,
+                    //fork时这样初始化正确吗，还是说要跟父进程一样
+                    task_start: 0,
+                    task_flag: false,
+                    task_syscall_times: [0; MAX_SYSCALL_NUM],
                 })
             },
         });

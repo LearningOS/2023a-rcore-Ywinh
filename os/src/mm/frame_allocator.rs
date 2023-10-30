@@ -37,7 +37,7 @@ impl Drop for FrameTracker {
     }
 }
 
-trait FrameAllocator {
+pub trait FrameAllocator {
     fn new() -> Self;
     fn alloc(&mut self) -> Option<PhysPageNum>;
     fn dealloc(&mut self, ppn: PhysPageNum);

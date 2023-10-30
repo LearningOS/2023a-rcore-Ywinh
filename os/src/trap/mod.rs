@@ -17,7 +17,8 @@ mod context;
 use crate::config::{TRAMPOLINE, TRAP_CONTEXT_BASE};
 use crate::syscall::syscall;
 use crate::task::{
-    current_trap_cx, current_user_token, exit_current_and_run_next, suspend_current_and_run_next,
+    current_task, current_trap_cx, current_user_token, exit_current_and_run_next,
+    suspend_current_and_run_next,
 };
 use crate::timer::set_next_trigger;
 use core::arch::{asm, global_asm};
@@ -66,6 +67,14 @@ pub fn trap_handler() -> ! {
             let mut cx = current_trap_cx();
             cx.sepc += 4;
             // get system call return value
+
+            //update task_syscall_times
+            let task = current_task().unwrap();
+            let mut inner = task.inner_exclusive_access();
+            inner.task_syscall_times[cx.x[17]] += 1;
+            //这个地方必须先drop
+            drop(inner);
+
             let result = syscall(cx.x[17], [cx.x[10], cx.x[11], cx.x[12]]);
             // cx is changed during sys_exec, so we have to call it again
             cx = current_trap_cx();

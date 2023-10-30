@@ -108,7 +108,7 @@ impl PageTable {
         result
     }
     /// Find PageTableEntry by VirtPageNum
-    fn find_pte(&self, vpn: VirtPageNum) -> Option<&mut PageTableEntry> {
+    pub fn find_pte(&self, vpn: VirtPageNum) -> Option<&mut PageTableEntry> {
         let idxs = vpn.indexes();
         let mut ppn = self.root_ppn;
         let mut result: Option<&mut PageTableEntry> = None;
@@ -157,6 +157,18 @@ impl PageTable {
     /// get the token from the page table
     pub fn token(&self) -> usize {
         8usize << 60 | self.root_ppn.0
+    }
+    /// pte is mapped?
+    pub fn mapped_valid(&self, vpn: VirtPageNum) -> bool {
+        //map不合法的两种情况：1.没找到pte，这时候一般需要create 2.找到了但是pte不合法
+        if let Some(i) = self.find_pte(vpn) {
+            if i.is_valid() {
+                return true;
+            } else {
+                return false;
+            }
+        }
+        false
     }
 }
 
@@ -212,4 +224,15 @@ pub fn translated_refmut<T>(token: usize, ptr: *mut T) -> &'static mut T {
         .translate_va(VirtAddr::from(va))
         .unwrap()
         .get_mut()
+}
+
+pub fn translate_va2pa(token: usize, va: VirtAddr) -> PhysAddr {
+    let page_table = PageTable::from_token(token);
+    //想办法写入对应的物理地址，va -> vpn -> ppn + offset -> pa
+    let vpn = va.floor();
+    let offset = va.page_offset();
+    let ppn = page_table.translate(vpn).unwrap().ppn();
+    let pa: PhysAddr = ppn.into();
+    let pa_offset: PhysAddr = PhysAddr(pa.0 + offset);
+    pa_offset
 }
