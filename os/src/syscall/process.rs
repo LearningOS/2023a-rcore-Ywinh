@@ -3,12 +3,12 @@
 use alloc::sync::Arc;
 
 use crate::{
-    config::MAX_SYSCALL_NUM,
+    config::{BIG_STRIDE, MAX_SYSCALL_NUM},
     fs::{open_file, OpenFlags},
     mm::{translated_refmut, translated_str},
     task::{
         add_task, current_task, current_user_token, exit_current_and_run_next,
-        suspend_current_and_run_next, TaskStatus,
+        suspend_current_and_run_next, TaskControlBlock, TaskStatus,
     },
 };
 
@@ -171,7 +171,32 @@ pub fn sys_spawn(_path: *const u8) -> isize {
         "kernel:pid[{}] sys_spawn NOT IMPLEMENTED",
         current_task().unwrap().pid.0
     );
-    -1
+    //模仿TaskControBlock::new，fork,和sysfork，以及task/mod里面的维护父子关系
+    let token = current_user_token();
+    let path = translated_str(token, _path);
+    if let Some(app_inode) = open_file(path.as_str(), OpenFlags::RDONLY) {
+        let all_data = app_inode.read_all();
+        let new_task = Arc::new(TaskControlBlock::new(all_data.as_slice()));
+        let mut new_task_inner = new_task.inner_exclusive_access();
+        let pid = new_task.getpid();
+
+        let current_task = current_task().unwrap();
+        let mut current_task_inner = current_task.inner_exclusive_access();
+
+        //建立父子关系
+        new_task_inner.parent = Some(Arc::downgrade(&current_task));
+        current_task_inner.children.push(new_task.clone());
+        drop(new_task_inner);
+
+        //好像不需要exec，因为entry point设置了
+        //task_control_block.exec(data);
+        //大问题，忘记add_task了，哭
+        add_task(new_task);
+
+        return pid as isize;
+    } else {
+        return -1;
+    }
 }
 
 // YOUR JOB: Set task priority.
@@ -180,5 +205,13 @@ pub fn sys_set_priority(_prio: isize) -> isize {
         "kernel:pid[{}] sys_set_priority NOT IMPLEMENTED",
         current_task().unwrap().pid.0
     );
-    -1
+    if _prio < 2 {
+        return -1;
+    }
+    let task = current_task().unwrap();
+    let mut inner = task.inner_exclusive_access();
+    inner.priority = _prio as usize;
+    inner.pass = BIG_STRIDE / inner.priority;
+
+    _prio
 }
