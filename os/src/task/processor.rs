@@ -56,6 +56,7 @@ lazy_static! {
 pub fn run_tasks() {
     loop {
         let mut processor = PROCESSOR.exclusive_access();
+
         if let Some(task) = fetch_task() {
             let idle_task_cx_ptr = processor.get_idle_task_cx_ptr();
             // access coming task TCB exclusively
@@ -68,6 +69,8 @@ pub fn run_tasks() {
                 task_inner.task_start = get_time_ms();
             }
             task_inner.task_flag = true;
+            //更新stride
+            task_inner.stride += task_inner.pass;
 
             // release coming task_inner manually
             drop(task_inner);
@@ -75,6 +78,7 @@ pub fn run_tasks() {
             processor.current = Some(task);
             // release processor manually
             drop(processor);
+
             unsafe {
                 __switch(idle_task_cx_ptr, next_task_cx_ptr);
             }
@@ -113,7 +117,7 @@ pub fn schedule(switched_task_cx_ptr: *mut TaskContext) {
     let mut processor = PROCESSOR.exclusive_access();
     let idle_task_cx_ptr = processor.get_idle_task_cx_ptr();
 
-    //idle_task_cx_ptr是下一个吗？好像只要在run_tasks里面就行了，流程是schedule回到idle,idle通过run_tasks回到新的
+    //idle_task_cx_ptr是下一个,好像只要在run_tasks里面就行了，流程是schedule回到idle,idle通过run_tasks回到新的
     drop(processor);
     unsafe {
         __switch(switched_task_cx_ptr, idle_task_cx_ptr);

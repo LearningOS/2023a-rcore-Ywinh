@@ -1,7 +1,7 @@
 //! Types related to task management & Functions for completely changing TCB
 use super::TaskContext;
 use super::{kstack_alloc, pid_alloc, KernelStack, PidHandle};
-use crate::config::{MAX_SYSCALL_NUM, TRAP_CONTEXT_BASE};
+use crate::config::{BIG_STRIDE, MAX_SYSCALL_NUM, TRAP_CONTEXT_BASE};
 use crate::mm::{MemorySet, PhysPageNum, VirtAddr, KERNEL_SPACE};
 use crate::sync::UPSafeCell;
 use crate::trap::{trap_handler, TrapContext};
@@ -21,7 +21,7 @@ pub struct TaskControlBlock {
     pub kernel_stack: KernelStack,
 
     /// Mutable
-    inner: UPSafeCell<TaskControlBlockInner>,
+    pub inner: UPSafeCell<TaskControlBlockInner>,
 }
 
 impl TaskControlBlock {
@@ -77,6 +77,15 @@ pub struct TaskControlBlockInner {
 
     /// syscall times
     pub task_syscall_times: [u32; MAX_SYSCALL_NUM],
+
+    ///stride
+    pub stride: usize,
+
+    ///pass
+    pub pass: usize,
+
+    ///prio
+    pub priority: usize,
 }
 
 impl TaskControlBlockInner {
@@ -130,6 +139,10 @@ impl TaskControlBlock {
                     task_start: 0,
                     task_flag: false,
                     task_syscall_times: [0; MAX_SYSCALL_NUM],
+                    stride: 0,
+                    //pass的初值设置
+                    pass: BIG_STRIDE / 16,
+                    priority: 16,
                 })
             },
         };
@@ -207,6 +220,9 @@ impl TaskControlBlock {
                     task_start: 0,
                     task_flag: false,
                     task_syscall_times: [0; MAX_SYSCALL_NUM],
+                    stride: 0,
+                    pass: BIG_STRIDE / 16,
+                    priority: 16,
                 })
             },
         });

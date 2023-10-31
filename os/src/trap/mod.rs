@@ -74,6 +74,8 @@ pub fn trap_handler() -> ! {
             inner.task_syscall_times[cx.x[17]] += 1;
             //这个地方必须先drop
             drop(inner);
+            //必须drop(task)，不然Arc计数有错
+            drop(task);
 
             let result = syscall(cx.x[17], [cx.x[10], cx.x[11], cx.x[12]]);
             // cx is changed during sys_exec, so we have to call it again
