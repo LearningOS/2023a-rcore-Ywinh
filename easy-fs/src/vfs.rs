@@ -73,6 +73,182 @@ impl Inode {
             })
         })
     }
+
+    ///link,只会被根目录调用
+    /// link有问题
+    pub fn link(&self, old_name: &str, new_name: &str) -> () {
+        //需要上锁
+        let mut fs = self.fs.lock();
+        //先通过old_name找到inode_id，然后新建一个目录项(new_name,inode_id)，写到self里面
+        self.modify_disk_inode(|disk_inode: &mut DiskInode| {
+            assert!(disk_inode.is_dir());
+            let inode_id = self.find_inode_id(old_name, disk_inode).unwrap();
+            let mut file_count = (disk_inode.size as usize) / DIRENT_SZ;
+            file_count += 1;
+            self.increase_size((file_count * DIRENT_SZ) as u32, disk_inode, &mut fs);
+
+            let new_direntry = DirEntry::new(new_name, inode_id);
+            //self.write_at((file_count - 1) * DIRENT_SZ, new_direntry.as_bytes());
+            disk_inode.write_at(
+                (file_count - 1) * DIRENT_SZ,
+                new_direntry.as_bytes(),
+                &self.block_device,
+            );
+        });
+    }
+
+    /*pub fn link(&self, old_name: &str, new_name: &str) -> isize {
+        let node_id = self.read_disk_inode(|disk_inode| self.find_inode_id(old_name, disk_inode));
+
+        if old_name == new_name || node_id.is_none() {
+            return -1;
+        }
+
+        let mut fs = self.fs.lock();
+        let node_id = node_id.unwrap();
+
+        self.insert_dir_entry(new_name, node_id, &mut fs);
+        0
+    }
+
+    fn insert_dir_entry(&self, name: &str, node_id: u32, fs: &mut MutexGuard<EasyFileSystem>) {
+        self.modify_disk_inode(|root_inode| {
+            let file_count = (root_inode.size as usize) / DIRENT_SZ;
+            let new_size = (file_count + 1) * DIRENT_SZ;
+
+            self.increase_size(new_size as u32, root_inode, fs);
+
+            let dirent = DirEntry::new(name, node_id);
+
+            root_inode.write_at(
+                file_count * DIRENT_SZ,
+                dirent.as_bytes(),
+                &self.block_device,
+            )
+        });
+    }*/
+
+    /// 删除目录项
+    pub fn delete_direntry(&self, name: &str, disk_inode: &mut DiskInode) {
+        let file_count = (disk_inode.size as usize) / DIRENT_SZ;
+        //找到name对应的目录索引号
+        let mut dirent = DirEntry::empty();
+        let mut index = 0;
+        for i in 0..file_count {
+            assert_eq!(
+                disk_inode.read_at(DIRENT_SZ * i, dirent.as_bytes_mut(), &self.block_device,),
+                DIRENT_SZ,
+            );
+            if dirent.name() == name {
+                index = i;
+                //assert_eq!(index, 54);
+                //一用self.write就会卡住，为什么
+                //self.write_at(index * DIRENT_SZ, DirEntry::empty().as_bytes_mut());
+                disk_inode.write_at(
+                    index * DIRENT_SZ,
+                    DirEntry::empty().as_bytes_mut(),
+                    &self.block_device,
+                );
+                break;
+            }
+        }
+        //然后把最后一个移过来覆盖这个，然后删除最后一个，inode_id可不是偏移
+        //assert_eq!(file_count - 1, index);
+        //assert_eq!(file_count, 60);
+        //下面这两行会卡住？
+        //self.read_at((file_count - 1) * DIRENT_SZ, dirent.as_bytes_mut());
+        //self.write_at(index * DIRENT_SZ, dirent.as_bytes_mut());
+        /*disk_inode.read_at(
+            (file_count - 1) * DIRENT_SZ,
+            dirent.as_bytes_mut(),
+            &self.block_device,
+        );
+        disk_inode.write_at(index * DIRENT_SZ, dirent.as_bytes_mut(), &self.block_device);
+
+        //删除最后一个
+        disk_inode.size -= DIRENT_SZ as u32;
+        disk_inode.write_at(
+            index * DIRENT_SZ,
+            DirEntry::empty().as_bytes_mut(),
+            &self.block_device,
+        );
+        assert!(self.find(name).is_none());
+
+        //看inode_id对应link是否为0
+        if self.link_num(self.find_inode_id(name, &disk_inode).unwrap()) == 0 {
+            disk_inode.clear_size(&self.block_device);
+        }*/
+    }
+
+    ///unlink,只会被根目录调用
+    pub fn unlink(&self, name: &str) -> () {
+        //需要上锁
+        let _fs = self.fs.lock();
+        //先通过name找到inode_id
+        //先删除目录项，然后遍历一遍根目录，看是否还有link，如果link为0，则删除inode对应的
+        self.modify_disk_inode(|disk_inode: &mut DiskInode| {
+            assert!(disk_inode.is_dir());
+            /*let inode_id = self.find_inode_id(name, disk_inode).unwrap();
+            let file_count = (disk_inode.size as usize) / DIRENT_SZ;
+            //self.increase_size((file_count * DIRENT_SZ) as u32, disk_inode, &mut fs);
+            //然后把最后一个移过来覆盖这个，然后删除最后一个，inode_id可不是偏移
+            let mut buf = DirEntry::empty();
+            self.read_at((file_count - 1) * DIRENT_SZ, buf.as_bytes_mut());
+            self.write_at((inode_id as usize) * DIRENT_SZ, buf.as_bytes_mut());
+            //删除最后一个
+            disk_inode.size -= DIRENT_SZ as u32;
+            self.write_at(
+                (inode_id as usize) * DIRENT_SZ,
+                DirEntry::empty().as_bytes_mut(),
+            );
+
+            //看inode_id对应link是否为0
+            if self.link_num(inode_id) == 0 {
+                disk_inode.clear_size(&self.block_device);
+            }*/
+            self.delete_direntry(name, disk_inode);
+        });
+    }
+
+    ///依旧只有root or 目录项会调用该函数
+    ///link_num没有问题
+    pub fn link_num(&self, inode_id: u32) -> u32 {
+        let _fs = self.fs.lock();
+        self.read_disk_inode(|disk_inode| {
+            assert!(disk_inode.is_dir());
+            let file_count = (disk_inode.size as usize) / DIRENT_SZ;
+            let mut dirent = DirEntry::empty();
+            let mut res = 0;
+            for i in 0..file_count {
+                assert_eq!(
+                    disk_inode.read_at(DIRENT_SZ * i, dirent.as_bytes_mut(), &self.block_device,),
+                    DIRENT_SZ,
+                );
+                if dirent.inode_id() == inode_id {
+                    res += 1;
+                }
+            }
+            res
+        })
+    }
+
+    ///inode is dir
+    pub fn is_dir(&self) -> bool {
+        self.read_disk_inode(|disk_inode| disk_inode.is_dir())
+    }
+
+    ///inode is file
+    pub fn is_file(&self) -> bool {
+        self.read_disk_inode(|disk_inode| disk_inode.is_file())
+    }
+
+    ///get_inode id
+    pub fn get_inode_id(&self) -> u32 {
+        self.fs
+            .lock()
+            .get_inode_id(self.block_id, self.block_offset)
+    }
+
     /// Increase the size of a disk inode
     fn increase_size(
         &self,
