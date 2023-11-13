@@ -28,7 +28,7 @@ position            content                     size (bytes)
   ------------------------------------------------------------------------
 ```
 
-<img src="C:\Users\Yin\AppData\Roaming\Typora\typora-user-images\image-20231113165922545.png" alt="image-20231113165922545" style="zoom:50%;" />
+<img src="..\png\image-20231113165922545.png" alt="image-20231113165922545" style="zoom:50%;" />
 
 <img src="https://rcore-os.cn/rCore-Tutorial-Book-v3/_images/user-stack-cmdargs.png" alt="../_images/user-stack-cmdargs.png" style="zoom: 67%;" />
 
@@ -79,7 +79,7 @@ position            content                     size (bytes)
 
 **实验结果**
 
-![image-20231113171610989](C:\Users\Yin\AppData\Roaming\Typora\typora-user-images\image-20231113171610989.png)
+![image-20231113171610989](..\png\image-20231113171610989.png)
 
 
 
