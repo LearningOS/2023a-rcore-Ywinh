@@ -173,29 +173,42 @@ impl ProcessControlBlock {
         // push arguments on user stack
         trace!("kernel: exec .. push arguments on user stack");
         let mut user_sp = task_inner.res.as_mut().unwrap().ustack_top();
+
+        //首先预留好所有的位置,从后往前预留,其实顺序无关紧要，减去的总数都是一样的
+        for i in (0..args.len()).rev() {
+            user_sp -= args[i].len() + 1;
+        }
+        let argv_end = user_sp;
         user_sp -= (args.len() + 1) * core::mem::size_of::<usize>();
-        let argv_base = user_sp;
+        //准备写入，user_sp目前指向argv数组的起始地址
         let mut argv: Vec<_> = (0..=args.len())
             .map(|arg| {
                 translated_refmut(
                     new_token,
-                    (argv_base + arg * core::mem::size_of::<usize>()) as *mut usize,
+                    (user_sp + arg * core::mem::size_of::<usize>()) as *mut usize,
                 )
             })
             .collect();
         *argv[args.len()] = 0;
+
+        let mut temp_ptr = argv_end;
         for i in 0..args.len() {
-            user_sp -= args[i].len() + 1;
-            *argv[i] = user_sp;
-            let mut p = user_sp;
+            *argv[i] = temp_ptr;
+            let mut p = temp_ptr;
             for c in args[i].as_bytes() {
                 *translated_refmut(new_token, p as *mut u8) = *c;
                 p += 1;
             }
             *translated_refmut(new_token, p as *mut u8) = 0;
+            temp_ptr += args[i].len() + 1;
         }
+
+        //写入argc
+        user_sp -= core::mem::size_of::<usize>();
+        *translated_refmut(new_token, user_sp as *mut isize) = args.len() as isize;
+
         // make the user_sp aligned to 8B for k210 platform
-        user_sp -= user_sp % core::mem::size_of::<usize>();
+        //user_sp -= user_sp % core::mem::size_of::<usize>();
         // initialize trap_cx
         trace!("kernel: exec .. initialize trap_cx");
         let mut trap_cx = TrapContext::app_init_context(
@@ -205,8 +218,10 @@ impl ProcessControlBlock {
             task.kstack.get_top(),
             trap_handler as usize,
         );
+        //println!("len is {}", args.len());
         trap_cx.x[10] = args.len();
-        trap_cx.x[11] = argv_base;
+        // trap_cx.x[11] = argv_base;
+        trap_cx.x[11] = user_sp + core::mem::size_of::<usize>();
         *task_inner.get_trap_cx() = trap_cx;
     }
 
