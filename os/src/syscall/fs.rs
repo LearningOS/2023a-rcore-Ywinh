@@ -1,7 +1,11 @@
 use crate::fs::{make_pipe, open_file, OpenFlags, Stat};
-use crate::mm::{translated_byte_buffer, translated_refmut, translated_str, UserBuffer};
+use crate::mm::{
+    translated_byte_buffer, translated_ref, translated_refmut, translated_str, UserBuffer,
+};
 use crate::task::{current_process, current_task, current_user_token};
 use alloc::sync::Arc;
+
+use super::Iovec;
 /// write syscall
 pub fn sys_write(fd: usize, buf: *const u8, len: usize) -> isize {
     trace!(
@@ -148,4 +152,44 @@ pub fn sys_unlinkat(_name: *const u8) -> isize {
         current_task().unwrap().process.upgrade().unwrap().getpid()
     );
     -1
+}
+
+/// manipulates the underlying device
+/// ioctl syscall
+pub fn sys_ioctl(_fd: usize, _buf: *const u8) -> isize {
+    //println!("fd is {}", _fd);
+    0
+}
+
+/// writev syscall
+pub fn sys_writev(fd: usize, buf: *const Iovec, iovcnt: usize) -> isize {
+    // println!("fd is {}", fd);
+    // println!("buf is {:?}", buf);
+    // println!("iovcnt is {}", iovcnt);
+    let token = current_user_token();
+    let process = current_process();
+    let inner = process.inner_exclusive_access();
+    let mut write_num = 0;
+    if fd >= inner.fd_table.len() {
+        return -1;
+    }
+    if let Some(file) = &inner.fd_table[fd] {
+        if !file.writable() {
+            return -1;
+        }
+        let file = file.clone();
+        // release current task TCB manually to avoid multi-borrow
+        drop(inner);
+        for i in 0..iovcnt {
+            let iov_ptr = translated_ref(token, buf.wrapping_add(i));
+            write_num += file.write(UserBuffer::new(translated_byte_buffer(
+                token,
+                (*iov_ptr).iov_base,
+                (*iov_ptr).iov_len,
+            ))) as isize;
+        }
+    } else {
+        return -1;
+    }
+    write_num
 }

@@ -6,7 +6,8 @@ use super::TaskControlBlock;
 use super::{add_task, SignalFlags};
 use super::{pid_alloc, PidHandle};
 use crate::fs::{File, Stdin, Stdout};
-use crate::mm::{translated_refmut, MemorySet, KERNEL_SPACE};
+use crate::loaders::ElfLoader;
+use crate::mm::{MemorySet, KERNEL_SPACE};
 use crate::sync::{Condvar, Mutex, Semaphore, UPSafeCell};
 use crate::trap::{trap_handler, TrapContext};
 use alloc::string::String;
@@ -174,38 +175,39 @@ impl ProcessControlBlock {
         trace!("kernel: exec .. push arguments on user stack");
         let mut user_sp = task_inner.res.as_mut().unwrap().ustack_top();
 
-        //首先预留好所有的位置,从后往前预留,其实顺序无关紧要，减去的总数都是一样的
-        for i in (0..args.len()).rev() {
-            user_sp -= args[i].len() + 1;
-        }
-        let argv_end = user_sp;
-        user_sp -= (args.len() + 1) * core::mem::size_of::<usize>();
-        //准备写入，user_sp目前指向argv数组的起始地址
-        let mut argv: Vec<_> = (0..=args.len())
-            .map(|arg| {
-                translated_refmut(
-                    new_token,
-                    (user_sp + arg * core::mem::size_of::<usize>()) as *mut usize,
-                )
-            })
-            .collect();
-        *argv[args.len()] = 0;
+        // //首先预留好所有的位置,从后往前预留,其实顺序无关紧要，减去的总数都是一样的
+        // for i in (0..args.len()).rev() {
+        //     user_sp -= args[i].len() + 1;
+        // }
+        // let argv_end = user_sp;
+        // user_sp -= (args.len() + 1) * core::mem::size_of::<usize>();
+        // //准备写入，user_sp目前指向argv数组的起始地址
+        // let mut argv: Vec<_> = (0..=args.len())
+        //     .map(|arg| {
+        //         translated_refmut(
+        //             new_token,
+        //             (user_sp + arg * core::mem::size_of::<usize>()) as *mut usize,
+        //         )
+        //     })
+        //     .collect();
+        // *argv[args.len()] = 0;
+        // let mut temp_ptr = argv_end;
+        // for i in 0..args.len() {
+        //     *argv[i] = temp_ptr;
+        //     let mut p = temp_ptr;
+        //     for c in args[i].as_bytes() {
+        //         *translated_refmut(new_token, p as *mut u8) = *c;
+        //         p += 1;
+        //     }
+        //     *translated_refmut(new_token, p as *mut u8) = 0;
+        //     temp_ptr += args[i].len() + 1;
+        // }
+        // //写入argc
+        // user_sp -= core::mem::size_of::<usize>();
+        // *translated_refmut(new_token, user_sp as *mut isize) = args.len() as isize;
 
-        let mut temp_ptr = argv_end;
-        for i in 0..args.len() {
-            *argv[i] = temp_ptr;
-            let mut p = temp_ptr;
-            for c in args[i].as_bytes() {
-                *translated_refmut(new_token, p as *mut u8) = *c;
-                p += 1;
-            }
-            *translated_refmut(new_token, p as *mut u8) = 0;
-            temp_ptr += args[i].len() + 1;
-        }
-
-        //写入argc
-        user_sp -= core::mem::size_of::<usize>();
-        *translated_refmut(new_token, user_sp as *mut isize) = args.len() as isize;
+        let elf = ElfLoader::new(elf_data).unwrap();
+        user_sp = elf.init_stack(new_token, user_sp, args.clone());
 
         // make the user_sp aligned to 8B for k210 platform
         //user_sp -= user_sp % core::mem::size_of::<usize>();
