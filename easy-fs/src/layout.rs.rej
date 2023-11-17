@@ -1,0 +1,20 @@
+diff a/easy-fs/src/layout.rs b/easy-fs/src/layout.rs	(rejected hunks)
+@@ -97,6 +98,7 @@ impl DiskInode {
+         self.indirect1 = 0;
+         self.indirect2 = 0;
+         self.type_ = type_;
++        self.nlink = 0;
+     }
+     /// Whether this inode is a directory
+     pub fn is_dir(&self) -> bool {
+@@ -391,8 +393,8 @@ impl DiskInode {
+ /// A directory entry
+ #[repr(C)]
+ pub struct DirEntry {
+-    name: [u8; NAME_LENGTH_LIMIT + 1],
+-    inode_id: u32,
++    pub name: [u8; NAME_LENGTH_LIMIT + 1],
++    pub inode_id: u32,
+ }
+ /// Size of a directory entry
+ pub const DIRENT_SZ: usize = 32;

@@ -139,6 +139,19 @@ impl PageTable {
         assert!(pte.is_valid(), "vpn {:?} is invalid before unmapping", vpn);
         *pte = PageTableEntry::empty();
     }
+
+    pub fn mapped_valid(&self, vpn: VirtPageNum) -> bool {
+        //map不合法的两种情况：1.没找到pte，这时候一般需要create 2.找到了但是pte不合法
+        if let Some(i) = self.find_pte(vpn) {
+            if i.is_valid() {
+                return true;
+            } else {
+                return false;
+            }
+        }
+        false
+    }
+
     /// get the page table entry from the virtual page number
     pub fn translate(&self, vpn: VirtPageNum) -> Option<PageTableEntry> {
         self.find_pte(vpn).map(|pte| *pte)
@@ -216,6 +229,17 @@ pub fn translated_refmut<T>(token: usize, ptr: *mut T) -> &'static mut T {
         .translate_va(VirtAddr::from(va))
         .unwrap()
         .get_mut()
+}
+
+pub fn translate_va2pa(token: usize, va: VirtAddr) -> PhysAddr {
+    let page_table = PageTable::from_token(token);
+    //想办法写入对应的物理地址，va -> vpn -> ppn + offset -> pa
+    let vpn = va.floor();
+    let offset = va.page_offset();
+    let ppn = page_table.translate(vpn).unwrap().ppn();
+    let pa: PhysAddr = ppn.into();
+    let pa_offset: PhysAddr = PhysAddr(pa.0 + offset);
+    pa_offset
 }
 
 /// An abstraction over a buffer passed from user space to kernel space

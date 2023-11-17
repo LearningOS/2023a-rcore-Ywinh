@@ -1,0 +1,37 @@
+diff a/os/src/task/task.rs b/os/src/task/task.rs	(rejected hunks)
+@@ -2,6 +2,7 @@
+ use super::TaskContext;
+ use super::{kstack_alloc, pid_alloc, KernelStack, PidHandle};
+ use crate::config::TRAP_CONTEXT_BASE;
++use crate::config::{BIG_STRIDE, MAX_SYSCALL_NUM};
+ use crate::fs::{File, Stdin, Stdout};
+ use crate::mm::{MemorySet, PhysPageNum, VirtAddr, KERNEL_SPACE};
+ use crate::sync::UPSafeCell;
+@@ -135,6 +155,13 @@ impl TaskControlBlock {
+                     ],
+                     heap_bottom: user_sp,
+                     program_brk: user_sp,
++                    task_start: 0,
++                    task_flag: false,
++                    task_syscall_times: [0; MAX_SYSCALL_NUM],
++                    stride: 0,
++                    //pass的初值设置
++                    pass: BIG_STRIDE / 16,
++                    priority: 16,
+                 })
+             },
+         };
+@@ -216,6 +243,13 @@ impl TaskControlBlock {
+                     fd_table: new_fd_table,
+                     heap_bottom: parent_inner.heap_bottom,
+                     program_brk: parent_inner.program_brk,
++                    //fork时这样初始化正确吗，还是说要跟父进程一样
++                    task_start: 0,
++                    task_flag: false,
++                    task_syscall_times: [0; MAX_SYSCALL_NUM],
++                    stride: 0,
++                    pass: BIG_STRIDE / 16,
++                    priority: 16,
+                 })
+             },
+         });

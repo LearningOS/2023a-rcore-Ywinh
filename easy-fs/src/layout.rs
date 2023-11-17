@@ -74,6 +74,7 @@ pub struct DiskInode {
     pub indirect1: u32,
     pub indirect2: u32,
     type_: DiskInodeType,
+    pub nlink: u32,
 }
 
 impl DiskInode {
@@ -372,8 +373,8 @@ impl DiskInode {
 
 #[repr(C)]
 pub struct DirEntry {
-    name: [u8; NAME_LENGTH_LIMIT + 1],
-    inode_id: u32,
+    pub name: [u8; NAME_LENGTH_LIMIT + 1],
+    pub inode_id: u32,
 }
 
 pub const DIRENT_SZ: usize = 32;

@@ -27,7 +27,21 @@ impl TaskManager {
     }
     /// Take a process out of the ready queue
     pub fn fetch(&mut self) -> Option<Arc<TaskControlBlock>> {
-        self.ready_queue.pop_front()
+        let mut min = 0xfffff;
+        let mut res_idx: usize = 0;
+        for (idx, p) in self.ready_queue.iter().enumerate() {
+            let temp = p.inner_exclusive_access();
+            if temp.stride < min {
+                min = temp.stride;
+                res_idx = idx;
+            }
+        }
+        if res_idx != 0 {
+            self.ready_queue.remove(res_idx)
+        } else {
+            //res_idx=0 两种情况：第0个为最小，或者队列为空，都可以这样处理
+            self.ready_queue.pop_front()
+        }
     }
 }
 
