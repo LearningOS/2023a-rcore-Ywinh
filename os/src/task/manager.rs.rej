@@ -1,7 +1,0 @@
-diff a/os/src/task/manager.rs b/os/src/task/manager.rs	(rejected hunks)
-@@ -1,4 +1,5 @@
- //!Implementation of [`TaskManager`]
-+
- use super::TaskControlBlock;
- use crate::sync::UPSafeCell;
- use alloc::collections::VecDeque;

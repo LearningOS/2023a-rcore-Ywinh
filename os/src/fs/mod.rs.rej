@@ -1,8 +1,0 @@
-diff a/os/src/fs/mod.rs b/os/src/fs/mod.rs	(rejected hunks)
-@@ -46,5 +58,5 @@ bitflags! {
-     }
- }
- 
--pub use inode::{list_apps, open_file, OSInode, OpenFlags};
-+pub use inode::{list_apps, open_file, OSInode, OpenFlags, ROOT_INODE};
- pub use stdio::{Stdin, Stdout};
