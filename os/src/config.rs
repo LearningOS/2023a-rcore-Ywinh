@@ -27,3 +27,5 @@ pub const MEMORY_END: usize = 0x88000000;
 pub const MMIO: &[(usize, usize)] = &[(0x10001000, 0x1000)];
 /// stride
 pub const BIG_STRIDE: usize = 0x100000;
+/// mail buffer max size
+pub const MAIL_BUF_SIZE: usize = 256;

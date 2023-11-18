@@ -11,6 +11,7 @@ use crate::{
     trap::{trap_handler, TrapContext},
 };
 use alloc::{
+    collections::VecDeque,
     string::String,
     sync::{Arc, Weak},
     vec,
@@ -108,6 +109,8 @@ pub struct TaskControlBlockInner {
 
     ///prio
     pub priority: usize,
+    ///mail add
+    pub mails: VecDeque<String>,
 }
 
 impl TaskControlBlockInner {
@@ -187,6 +190,8 @@ impl TaskControlBlock {
                     //pass的初值设置
                     pass: BIG_STRIDE / 16,
                     priority: 16,
+                    //mail
+                    mails: VecDeque::new(),
                 })
             },
         };
@@ -309,6 +314,8 @@ impl TaskControlBlock {
                     stride: 0,
                     pass: BIG_STRIDE / 16,
                     priority: 16,
+                    //mail
+                    mails: VecDeque::new(),
                 })
             },
         });

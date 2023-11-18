@@ -1,7 +1,7 @@
 //! Process management syscalls
 
 use crate::{
-    config::{BIG_STRIDE, MAX_SYSCALL_NUM, PAGE_SIZE},
+    config::{BIG_STRIDE, MAIL_BUF_SIZE, MAX_SYSCALL_NUM, PAGE_SIZE},
     fs::{open_file, OpenFlags},
     mm::{
         translate_va2pa, translated_ref, translated_refmut, translated_str, MapPermission,
@@ -399,4 +399,75 @@ pub fn sys_sigaction(
     } else {
         -1
     }
+}
+
+pub fn sys_mail_read(buf: *mut u8, mut len: usize) -> isize {
+    println!("[sys_mail_read]:input_len is {}", len);
+    if len > MAIL_BUF_SIZE {
+        len = MAIL_BUF_SIZE;
+    }
+    let token = current_user_token();
+    let task = current_task().unwrap();
+    let mut inner = task.inner.exclusive_access();
+
+    //buf无效，len为0，邮箱空，都返回1
+    if len == 0 {
+        if inner.mails.len() == 0 {
+            return -1;
+        } else {
+            return 0;
+        }
+    }
+    if buf == core::ptr::null_mut() || inner.mails.len() == 0 {
+        return -1;
+    }
+    //开始读取
+    let mail = inner.mails.pop_front().unwrap();
+    if len > mail.len() {
+        len = mail.len();
+    }
+    println!("[sys_mail_read]:read len is {}", len);
+
+    //println!("read len is {}", arr.len);
+    for i in 0..len {
+        let buf_ptr = translated_refmut(token, unsafe { buf.add(i) });
+        *buf_ptr = mail.as_bytes()[i];
+    }
+
+    len as isize
+}
+
+pub fn sys_mail_write(pid: usize, buf: *mut u8, mut len: usize) -> isize {
+    println!("[sys_mail_write]:len is {}", len);
+    if len > MAIL_BUF_SIZE {
+        len = MAIL_BUF_SIZE;
+    }
+    let token = current_user_token();
+    if pid2task(pid).is_none() {
+        return -1;
+    }
+    let task_dest = pid2task(pid).unwrap();
+    let mut inner = task_dest.inner.exclusive_access();
+    //let mut mails = &inner.mails;
+    //let buf_ptr = translated_refmut(token, buf);
+    if len == 0 {
+        if inner.mails.len() == 16 {
+            return -1;
+        } else {
+            return 0;
+        }
+    }
+    if buf == core::ptr::null_mut() || inner.mails.len() == 16 {
+        return -1;
+    }
+
+    let mut s = translated_str(token, buf);
+    while s.len() > len {
+        s.remove(len);
+    }
+
+    println!("write len is {}", s.len());
+    inner.mails.push_back(s);
+
+    len as isize
 }
